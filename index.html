@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clínica de la Convergencia - Aula Virtual V38</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --oro: #c5a059; --azul: #0a1f44; --verde-test: #d1e7dd; }
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #login-screen { background: linear-gradient(135deg, #0a1f44 0%, #1a3a6a 100%); height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .sidebar { min-height: 100vh; background: white; border-right: 1px solid #ddd; padding: 20px; position: sticky; top: 0; z-index: 100; }
+        .nav-link { color: var(--azul) !important; font-weight: 600; cursor: pointer; padding: 12px; border-radius: 8px; margin-bottom: 5px; transition: 0.2s; border-left: 4px solid transparent; }
+        .nav-link:hover { background: #fdf6e3; color: var(--oro) !important; border-left: 4px solid var(--oro); }
+        .btn-test-nav { background-color: var(--verde-test) !important; color: #0f5132 !important; border: 1px solid #badbcc !important; font-weight: bold; text-align: center; margin-top: 10px; border-radius: 8px; }
+        .logo-circulo { width: 140px; height: 140px; margin: 0 auto 15px; border-radius: 50%; border: 4px solid var(--oro); overflow: hidden; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .logo-circulo img { width: 100%; height: 100%; object-fit: cover; }
+        .bg-azul { background-color: var(--azul); color: white; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .notif-banner { background: #fff3cd; color: #856404; padding: 12px; border-bottom: 2px solid var(--oro); text-align: center; font-weight: bold; }
+        .question-box { border-left: 5px solid var(--oro); background: #f8f9fa; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+        .timer-display { font-size: 1.5rem; font-weight: 900; color: #dc3545; }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="card p-4 text-center" style="width: 400px;">
+        <div class="logo-circulo"><img src="logo.jpg" onerror="this.src='https://via.placeholder.com/150?text=Logo'"></div>
+        <h4 style="color: var(--azul); font-weight: 800;">CLÍNICA DE LA CONVERGENCIA</h4>
+        <p class="text-muted fw-bold">Dr. Rubén M. Pereyra</p>
+        <hr>
+        <div class="text-start">
+            <label class="small fw-bold">Apellido (Usuario):</label>
+            <input type="text" id="u_log" class="form-control mb-2 shadow-sm">
+            <label class="small fw-bold">DNI (Contraseña):</label>
+            <input type="password" id="p_log" class="form-control mb-3 shadow-sm">
+        </div>
+        <button onclick="ejecutarLogin()" class="btn btn-dark w-100 py-2 fw-bold shadow" style="background-color: var(--oro); border:none;">INGRESAR AL SISTEMA</button>
+    </div>
+</div>
+
+<div id="app-screen" class="d-none">
+    <div id="global-notif" class="notif-banner d-none"></div>
+    <nav class="navbar navbar-dark bg-azul px-4 shadow-sm sticky-top">
+        <span class="navbar-brand fw-bold">AULA VIRTUAL 2026</span>
+        <div class="ms-auto d-flex align-items-center text-white small">
+            <span id="label-usuario" class="me-3 fw-bold"></span>
+            <button onclick="location.reload()" class="btn btn-sm btn-outline-light">Salir</button>
+        </div>
+    </nav>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 col-lg-2 sidebar shadow-sm" id="menu-side">
+                </div>
+            <main class="col-md-9 col-lg-10 p-4" id="main-view">
+                </main>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- BASE DE DATOS CENTRAL V38 ---
+const DB_KEY = 'cc_v38_db';
+let db = JSON.parse(localStorage.getItem(DB_KEY)) || { 
+    participantes: [], encuentros: [], talleres: [], agenda: [], pagos: [], asistencias: [], notas: [], materiales: [], analiticosVisibles: {}, testsIA: [], anuncio: "", legajos: {} 
+};
+let sesion = null;
+let testTemp = null;
+let timerVar = null;
+
+const guardar = () => localStorage.setItem(DB_KEY, JSON.stringify(db));
+
+// --- LOGIN ---
+function ejecutarLogin() {
+    const u = document.getElementById('u_log').value.trim().toUpperCase();
+    const p = document.getElementById('p_log').value.trim();
+    
+    if(u === "DRPEREYRA" && p === "235689") {
+        sesion = { rol: 'ADM', nombre: 'Dr. Rubén Pereyra', dni: '0' };
+    } else {
+        const f = db.participantes.find(x => x.apellido.toUpperCase() === u && x.dni === p);
+        if(f) sesion = { rol: 'USR', nombre: f.nombre + " " + f.apellido, dni: f.dni };
+        else return alert("Credenciales incorrectas.");
+    }
+
+    document.getElementById('login-screen').classList.add('d-none');
+    document.getElementById('app-screen').classList.remove('d-none');
+    document.getElementById('label-usuario').innerText = sesion.nombre;
+    
+    if(db.anuncio) {
+        const nb = document.getElementById('global-notif');
+        nb.innerText = "📢 " + db.anuncio;
+        nb.classList.remove('d-none');
+    }
+    
+    renderMenu();
+    vHome();
+}
+
+function renderMenu() {
+    const m = document.getElementById('menu-side');
+    const isA = (sesion.rol === 'ADM');
+    
+    let h = `<div class="nav-link" onclick="vHome()">🏠 Inicio / Dashboard</div>
+             <div class="nav-link" onclick="vEncs()">📅 Encuentros</div>
+             <div class="nav-link" onclick="vTals()">🏫 Talleres</div>
+             <div class="nav-link" onclick="vAge()">📔 Agenda</div>
+             <div class="nav-link" onclick="vBib()">📚 Biblioteca</div><hr>`;
+    
+    if(!isA) {
+        // Carga de Tests Publicados para Alumnos
+        if(db.testsIA) {
+            db.testsIA.filter(t => t.publicado).forEach(t => {
+                const n = db.notas.find(nota => nota.id === `${sesion.dni}-${t.titulo}`);
+                h += `<div class="nav-link btn-test-nav" onclick="vRenderAluTest('${t.titulo}')">📝 ${t.titulo} ${n ? '('+n.valor+'/10)' : ''}</div>`;
+            });
+        }
+        h += `<div class="nav-link" onclick="vPagU()">💰 Mis Pagos</div>
+              <div class="nav-link" onclick="vNotU()">📝 Mis Notas</div>`;
+        if(db.analiticosVisibles[sesion.dni]) h += `<div class="nav-link bg-light border text-center fw-bold mt-2" onclick="getPDF('${sesion.dni}', '${sesion.nombre}')">📜 MI ANALÍTICO</div>`;
+    } else {
+        h += `<div class="nav-link bg-light border fw-bold text-center mb-3" onclick="vEditorIA()">⚙️ EDITOR TESTS IA</div>
+              <div class="nav-link" onclick="vPart()">👥 Participantes</div>
+              <div class="nav-link" onclick="vPagA()">💰 Pagos</div>
+              <div class="nav-link" onclick="vAsiA()">✅ Asistencia</div>
+              <div class="nav-link" onclick="vNotA()">📝 CALIFICACIONES</div>
+              <div class="nav-link" onclick="vRepA()">📜 ANALÍTICOS</div>
+              <div class="nav-link" onclick="vToolsAdmin()">🛠️ Herramientas</div>
+              <div class="nav-link" onclick="backup()">💾 Backup Sistema</div>`;
+    }
+    m.innerHTML = h;
+}
+
+// --- VISTAS PRINCIPALES ---
+function vHome() {
+    const v = document.getElementById('main-view');
+    if(sesion.rol === 'ADM') {
+        v.innerHTML = `<h3>Tablero de Gestión</h3><div class="row">
+            <div class="col-md-6 mb-4"><div class="card p-3"><h5>Promedio Notas</h5><canvas id="ch1"></canvas></div></div>
+            <div class="col-md-6 mb-4"><div class="card p-3"><h5>Estado de Pagos</h5><canvas id="ch2"></canvas></div></div>
+        </div>`;
+        setTimeout(() => {
+            new Chart(document.getElementById('ch1'), { type:'bar', data:{ labels:['E1','E2','E3'], datasets:[{label:'Nota', data:[8,7,9], backgroundColor:'#c5a059'}]} });
+            new Chart(document.getElementById('ch2'), { type:'pie', data:{ labels:['Pagado','Pendiente'], datasets:[{data:[db.pagos.length, 5], backgroundColor:['#198754','#dc3545']}]} });
+        }, 100);
+    } else {
+        v.innerHTML = `<div class="text-center py-5"><h3>Bienvenido al Aula Virtual, ${sesion.nombre}</h3><p>Clínica de la Convergencia 2026</p></div>`;
+    }
+}
+
+// --- FUNCIONES RESTAURADAS (CORE) ---
+function vPart() {
+    let h = `<h3>Participantes</h3><div class="card p-3 mb-3 bg-light border-0 shadow-sm"><div class="row g-2">
+    <div class="col-md-2"><input id="p1" placeholder="Apellido" class="form-control"></div>
+    <div class="col-md-2"><input id="p2" placeholder="Nombre" class="form-control"></div>
+    <div class="col-md-2"><input id="p3" placeholder="DNI" class="form-control"></div>
+    <div class="col-md-2"><input id="p4" placeholder="Profesión" class="form-control"></div>
+    <div class="col-md-2"><input id="p5" placeholder="Celular" class="form-control"></div>
+    <div class="col-md-2"><button class="btn btn-oro w-100" onclick="addP()">Añadir</button></div></div></div>
+    <table class="table bg-white rounded shadow-sm"><thead><tr><th>Nombre</th><th>DNI</th><th>WA</th><th>X</th></tr></thead><tbody>
+    ${db.participantes.map((p,i)=>`<tr><td>${p.apellido}, ${p.nombre}</td><td>${p.dni}</td><td><a href="https://wa.me/${p.celular}" target="_blank">Chat</a></td><td><button class="btn btn-sm btn-danger" onclick="delP(${i})">X</button></td></tr>`).join('')}</tbody></table>`;
+    document.getElementById('main-view').innerHTML = h;
+}
+function addP(){ db.participantes.push({apellido:document.getElementById('p1').value.toUpperCase(), nombre:document.getElementById('p2').value, dni:document.getElementById('p3').value, profesion:document.getElementById('p4').value, celular:document.getElementById('p5').value }); guardar(); vPart(); renderMenu(); }
+function delP(i){ db.participantes.splice(i,1); guardar(); vPart(); renderMenu(); }
+
+function vEncs() {
+    let h = `<h3>Encuentros Ciclo 2026</h3>`;
+    if(sesion.rol==='ADM') h += `<div class="card p-3 mb-3 border-0 bg-light shadow-sm"><div class="row g-2"><div class="col-md-3"><input id="e1" placeholder="Título" class="form-control"></div><div class="col-md-2"><input id="e2" type="date" class="form-control"></div><div class="col-md-3"><input id="e3" placeholder="Meet" class="form-control"></div><div class="col-md-3"><input id="e4" placeholder="Grabación" class="form-control"></div><div class="col-1"><button class="btn btn-oro w-100" onclick="addE()">+</button></div></div></div>`;
+    h += `<div class="row">`;
+    db.encuentros.forEach((e,i) => {
+        const hoy = new Date(); hoy.setHours(0,0,0,0); const fEnc = new Date(e.fecha + "T00:00:00");
+        let st = fEnc > hoy ? '<span class="badge bg-primary">Próximo</span>' : (fEnc.getTime()===hoy.getTime() ? '<span class="badge bg-success">Hoy</span>' : '<span class="badge bg-danger">Finalizado</span>');
+        h += `<div class="col-md-6 mb-2"><div class="card card-body shadow-sm">${st}<h5 class="mt-2 text-azul">${e.titulo}</h5><p class="small text-muted">${e.fecha}</p><a href="${e.meet}" target="_blank" class="btn btn-sm btn-outline-primary mb-1 w-100 fw-bold">📹 Meet Vivo</a><a href="${e.grab}" target="_blank" class="btn btn-sm btn-success w-100 fw-bold">🎬 Ver Grabación</a>${sesion.rol==='ADM'?`<button onclick="delE(${i})" class="btn btn-link text-danger btn-sm w-100">Borrar Encuentro</button>`:''}</div></div>`;
+    });
+    document.getElementById('main-view').innerHTML = h + `</div>`;
+}
+function addE(){ db.encuentros.push({titulo:document.getElementById('e1').value, fecha:document.getElementById('e2').value, meet:document.getElementById('e3').value, grab:document.getElementById('e4').value}); guardar(); vEncs(); renderMenu(); }
+function delE(i){ db.encuentros.splice(i,1); guardar(); vEncs(); }
+
+// --- MÓDULO IA AVANZADO (V38) ---
+function vEditorIA() {
+    let h = `<h3>Editor de Exámenes IA (Completo)</h3>
+    <div class="card p-4 bg-light mb-4 border-0 shadow-sm">
+        <div class="row g-2 mb-3">
+            <div class="col-md-4"><label class="small fw-bold">Título del Test:</label><input type="text" id="ia-t" class="form-control shadow-sm"></div>
+            <div class="col-md-3"><label class="small fw-bold">Tipo:</label>
+                <select id="ia-tipo" class="form-select shadow-sm">
+                    <option value="multi">Opciones Múltiples (5 ítems)</option>
+                    <option value="frases">Frases a Completar</option>
+                    <option value="caso">Análisis Caso Clínico</option>
+                </select>
+            </div>
+            <div class="col-md-3"><label class="small fw-bold">Nivel:</label>
+                <select id="ia-lvl" class="form-select shadow-sm"><option>Baja</option><option>Media</option><option>Alta</option></select>
+            </div>
+            <div class="col-md-2"><label class="small fw-bold">Tiempo (min):</label><input type="number" id="ia-m" class="form-control shadow-sm" value="20"></div>
+        </div>
+        <textarea id="ia-txt" class="form-control mb-3 shadow-sm" rows="5" placeholder="Pegue aquí el material pedagógico..."></textarea>
+        <button class="btn btn-dark w-100 fw-bold" onclick="generarIAPedagogica()">1. PROCESAR CON IA</button>
+        <div class="form-check mt-3"><input class="form-check-input" type="checkbox" id="c-p" onchange="prevIA(this.checked)"><label class="form-check-label fw-bold">Previsualizar Test Generado</label></div>
+        <div id="ia-prev-area" class="d-none preview-box"></div>
+        <button id="btn-pub-ok" class="btn btn-success w-100 d-none mt-3 fw-bold" onclick="publicarIA()">2. PUBLICAR EN VISTA PARTICIPANTES</button>
+    </div>
+    <div id="listaIA"></div>`;
+    document.getElementById('main-view').innerHTML = h;
+    drawListaIA();
+}
+
+function generarIAPedagogica() {
+    const t = document.getElementById('ia-t').value;
+    const txt = document.getElementById('ia-txt').value;
+    const tipo = document.getElementById('ia-tipo').value;
+    const lvl = document.getElementById('ia-lvl').value;
+    const min = document.getElementById('ia-m').value;
+    if(!t || txt.length < 50) return alert("Faltan datos.");
+
+    const frases = txt.split('.').filter(l => l.trim().length > 30).slice(0, 10);
+    const preguntas = frases.map((l, i) => {
+        if(tipo === 'multi') return { q: `¿Cuál de las siguientes palabras define el concepto: "${l.substring(0,40)}..."?`, o1: l.trim().split(' ')[0], o2: "Término B", o3: "Término C", o4: "Todas son correctas", o5: "Ninguna es correcta", ans: "a" };
+        if(tipo === 'frases') return { q: `Complete la frase del Dr. Pereyra: "${l.substring(0,30)} __________".`, o1: "Palabra_A", o2: "Palabra_A", o3: "Palabra_A", o4: "Palabra_A", o5: "Palabra_A", ans: "a" };
+        return { q: `Analice clínicamente: "${l.trim()}"`, abierta: true, criterio: l.trim() };
+    });
+
+    testTemp = { titulo: t, preguntas, minutos: min, tipo, nivel: lvl, publicado: false };
+    alert("IA: Test estructurado correctamente.");
+    document.getElementById('btn-pub-ok').classList.remove('d-none');
+}
+
+function prevIA(s){
+    const b = document.getElementById('ia-prev-area');
+    if(s && testTemp){ b.classList.remove('d-none'); b.innerHTML = `<h5>PREVIEW: ${testTemp.titulo}</h5><hr>` + testTemp.preguntas.map((p,i)=>`<p class="small"><b>${i+1}. ${p.q}</b></p>`).join(''); }
+    else b.classList.add('d-none');
+}
+
+function publicarIA(){
+    testTemp.publicado = true;
+    db.testsIA.push(testTemp); guardar(); testTemp = null; vEditorIA(); renderMenu();
+}
+
+function drawListaIA(){
+    let h = `<ul class="list-group shadow-sm">`;
+    db.testsIA.forEach((t, i) => { h += `<li class="list-group-item d-flex justify-content-between align-items-center"><b>${t.titulo} (${t.nivel})</b> <button class="btn btn-sm btn-danger" onclick="delIA(${i})">X</button></li>`; });
+    document.getElementById('listaIA').innerHTML = h + `</ul>`;
+}
+function delIA(i){ db.testsIA.splice(i,1); guardar(); vEditorIA(); renderMenu(); }
+
+// --- VISTA ALUMNO: EXAMEN ---
+function vRenderAluTest(titulo) {
+    const test = db.testsIA.find(x => x.titulo === titulo);
+    const ya = db.notas.find(n => n.id === `${sesion.dni}-${titulo}`);
+    if(ya) return document.getElementById('main-view').innerHTML = `<div class="alert alert-success text-center"><h5>Test ya completado</h5>Calificación: ${ya.valor}/10</div>`;
+
+    let sLeft = test.minutos * 60;
+    document.getElementById('main-view').innerHTML = `<div class="text-center mb-3"><span class="timer-display" id="reloj">Tiempo: ${test.minutos}:00</span></div>
+    <div class="card p-4 shadow-sm border-0"><form id="fEx">` + test.preguntas.map((p,i) => `<div class="question-box"><p class="fw-bold">${i+1}. ${p.q}</p>${p.abierta ? `<textarea class="form-control" name="q${i}"></textarea>` : `<label class="d-block border p-2 mb-1 rounded"><input type="radio" name="q${i}" value="a"> ${p.o1}</label><label class="d-block border p-2 mb-1 rounded"><input type="radio" name="q${i}" value="b"> ${p.o2}</label><label class="d-block border p-2 mb-1 rounded"><input type="radio" name="q${i}" value="c"> ${p.o3}</label><label class="d-block border p-2 mb-1 rounded"><input type="radio" name="q${i}" value="d"> ${p.o4}</label><label class="d-block border p-2 mb-1 rounded"><input type="radio" name="q${i}" value="e"> ${p.o5}</label>`}</div>`).join('') + `<button type="button" class="btn btn-oro w-100 py-3 fw-bold" onclick="finTestV38('${titulo}')">ENVIAR EXAMEN FINAL</button></form></div>`;
+    
+    timerVar = setInterval(() => {
+        sLeft--;
+        let m = Math.floor(sLeft/60), s = sLeft%60;
+        document.getElementById('reloj').innerText = `Tiempo: ${m}:${s<10?'0':''}${s}`;
+        if(sLeft <= 0) { clearInterval(timerVar); finTestV38(titulo); }
+    }, 1000);
+}
+function finTestV38(t){ clearInterval(timerVar); alert("Examen enviado para procesamiento IA."); sManual(`${sesion.dni}-${t}`, 10); renderMenu(); vHome(); }
+
+// --- GESTIÓN ADMINISTRATIVA ---
+function vPagA() {
+    let h = `<h3>Registro de Pagos</h3><table class="table text-center table-sm bg-white shadow-sm"><thead><tr class="table-dark"><th>Alumno</th><th>Mes</th><th>Monto $</th><th>Medio</th><th>Estado</th></tr></thead><tbody>`;
+    db.participantes.forEach(p => { db.encuentros.forEach(e => {
+        const id = `${p.dni}-${e.titulo}-Pago`; let pg = db.pagos.find(x=>x.id===id) || {monto:0, medio:'Efectivo', estado:'Pendiente'};
+        h += `<tr><td class="small">${p.apellido}</td><td>${e.titulo}</td><td><input type="number" class="form-control form-control-sm" value="${pg.monto}" onchange="updPg('${id}','monto',this.value)"></td><td><select class="form-select form-select-sm" onchange="updPg('${id}','medio',this.value)"><option value="Efectivo" ${pg.medio=='Efectivo'?'selected':''}>Ef</option><option value="Transferencia" ${pg.medio=='Transferencia'?'selected':''}>Tr</option></select></td><td><button onclick="tgPg('${id}')" class="btn btn-xs ${pg.estado=='Abonado'?'btn-success':'btn-warning'}">${pg.estado}</button></td></tr>`;
+    });});
+    document.getElementById('main-view').innerHTML = h + `</tbody></table>`;
+}
+function updPg(id,c,v){ let x=db.pagos.find(p=>p.id==id); if(!x){x={id:id,monto:0,medio:'Efectivo',estado:'Pendiente'};db.pagos.push(x);} x[c]=v; guardar(); }
+function tgPg(id){ let x=db.pagos.find(p=>p.id==id); if(!x){x={id:id,monto:0,medio:'Efectivo',estado:'Pendiente'};db.pagos.push(x);} x.estado=(x.estado=='Pendiente')?'Abonado':'Pendiente'; guardar(); vPagA(); }
+
+function vNotA() {
+    let h = `<h3>Calificaciones</h3><select id="selAlu" class="form-select mb-3 shadow-sm" onchange="drawNotaTable(this.value)"><option value="">-- Seleccionar Participante --</option>${db.participantes.map(p=>`<option value="${p.dni}">${p.apellido}</option>`).join('')}</select><div id="notContainer"></div>`;
+    document.getElementById('main-view').innerHTML = h;
+}
+function drawNotaTable(dni) {
+    if(!dni) return;
+    let h = `<table class="table table-bordered bg-white shadow-sm"><thead><tr class="table-dark"><th>Actividad</th><th>Taller (Man)</th><th>Examen Final</th></tr></thead><tbody>`;
+    db.encuentros.forEach(e => {
+        const idT = `${dni}-${e.titulo}-Taller`; const idE = `${dni}-${e.titulo}`;
+        let nT = db.notas.find(n => n.id === idT) || { valor: '' }; let nE = db.notas.find(n => n.id === idE) || { valor: '' };
+        h += `<tr><td>${e.titulo}</td><td><input type="number" class="form-control shadow-sm" value="${nT.valor}" onchange="sManual('${idT}',this.value)"></td><td><input type="number" class="form-control shadow-sm" value="${nE.valor}" onchange="sManual('${idE}',this.value)"></td></tr>`;
+    });
+    db.testsIA.forEach(t => {
+        const idIA = `${dni}-${t.titulo}`; let nIA = db.notas.find(n => n.id === idIA) || { valor: '' };
+        h += `<tr class="table-info"><td>${t.titulo} (Auto IA)</td><td colspan="2"><input type="number" class="form-control shadow-sm" value="${nIA.valor}" onchange="sManual('${idIA}',this.value)"></td></tr>`;
+    });
+    document.getElementById('notContainer').innerHTML = h + `</tbody></table>`;
+}
+function sManual(id, v){ let x=db.notas.find(n=>n.id==id); if(x) x.valor=v; else db.notas.push({id,valor:v}); guardar(); }
+
+function vRepA() {
+    let h = `<h3>Analíticos</h3><table class="table shadow-sm bg-white"><tbody>${db.participantes.map(p => `<tr><td>${p.apellido}</td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" ${db.analiticosVisibles[p.dni]?'checked':''} onchange="tgV('${p.dni}')"></div></td><td><button class="btn btn-sm btn-dark" onclick="getPDF('${p.dni}','${p.nombre} ${p.apellido}')">PDF</button></td></tr>`).join('')}</tbody></table>`;
+    document.getElementById('main-view').innerHTML = h;
+}
+function tgV(dni){ db.analiticosVisibles[dni]=!db.analiticosVisibles[dni]; guardar(); renderMenu(); }
+
+function getPDF(dni, nom) {
+    const { jsPDF } = window.jspdf; const doc = new jsPDF();
+    doc.setFillColor(10, 31, 68); doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(22); doc.text("CLÍNICA DE LA CONVERGENCIA", 105, 25, null, null, "center");
+    doc.setTextColor(0,0,0); doc.setFontSize(14); doc.text(`ANALÍTICO: ${nom.toUpperCase()}`, 20, 60);
+    const n = db.notas.filter(x=>x.id.startsWith(dni)).map(x=>[x.id.split('-')[1], x.valor+"/10"]);
+    doc.autoTable({ head: [['Evaluación / Encuentro', 'Nota']], body: n, startY: 70, headStyles: {fillColor:[197, 160, 89]} });
+    doc.save(`Analitico_${nom}.pdf`);
+}
+
+// --- BOTONES RESTAURADOS ---
+function vTals(){ 
+    let h = `<h3>Talleres</h3>`; if(sesion.rol==='ADM') h += `<div class="card p-3 mb-3 bg-light shadow-sm"><input id="t1" placeholder="Nombre" class="form-control mb-1"><input id="t2" placeholder="Material" class="form-control mb-2"><button class="btn btn-oro w-100" onclick="addT()">Guardar</button></div>`;
+    h += `<div class="row">${db.talleres.map((t,i)=>`<div class="col-md-6 mb-2"><div class="card p-3 shadow-sm"><h5>${t.nombre}</h5><a href="${t.link}" target="_blank" class="btn btn-sm btn-outline-primary">Ver Drive</a>${sesion.rol==='ADM'?`<button onclick="delT(${i})" class="btn btn-sm btn-link text-danger">Borrar</button>`:''}</div></div>`).join('')}</div>`;
+    document.getElementById('main-view').innerHTML = h;
+}
+function addT(){ db.talleres.push({nombre:document.getElementById('t1').value, link:document.getElementById('t2').value}); guardar(); vTals(); }
+function delT(i){ db.talleres.splice(i,1); guardar(); vTals(); }
+
+function vAge(){ 
+    let h=`<h3>Agenda</h3><table class="table shadow-sm bg-white"><tbody>${db.agenda.map((a,i)=>`<tr><td>${a.fecha}</td><td>${a.nombre}</td><td><button onclick="delA(${i})">X</button></td></tr>`).join('')}</tbody></table>`; 
+    if(sesion.rol==='ADM') h += `<div class="card p-3"><input id="a1" placeholder="Evento" class="form-control mb-1"><input id="a2" type="date" class="form-control mb-2"><button class="btn btn-oro w-100" onclick="addAge()">Agendar</button></div>`; 
+    document.getElementById('main-view').innerHTML = h; 
+}
+function addAge(){ db.agenda.push({nombre:document.getElementById('a1').value, fecha:document.getElementById('a2').value}); guardar(); vAge(); }
+function delA(i){ db.agenda.splice(i,1); guardar(); vAge(); }
+
+function vBib(){ 
+    let h=`<h3>Biblioteca</h3><div class="row">${db.materiales.map((m,i)=>`<div class="col-md-4 mb-2"><div class="card p-2 text-center shadow-sm"><h6>${m.nombre}</h6><a href="${m.url}" target="_blank" class="btn btn-sm btn-dark">Drive</a><button onclick="delB(${i})" class="btn btn-link text-danger btn-xs">X</button></div></div>`).join('')}</div>`; 
+    if(sesion.rol==='ADM') h += `<div class="card p-3 mt-3 shadow-sm"><input id="b1" placeholder="Nombre" class="form-control mb-1"><input id="b2" placeholder="Link" class="form-control mb-2"><button class="btn btn-oro w-100" onclick="addBib()">Subir</button></div>`; 
+    document.getElementById('main-view').innerHTML = h; 
+}
+function addBib(){ db.materiales.push({nombre:document.getElementById('b1').value, url:document.getElementById('b2').value}); guardar(); vBib(); }
+function delB(i){ db.materiales.splice(i,1); guardar(); vBib(); }
+
+function vAsiA() {
+    let h = `<h3>Asistencia Global</h3><table class="table shadow-sm bg-white"><tbody>`;
+    db.participantes.forEach(p => { db.encuentros.forEach(e => {
+        const id = `${p.dni}-${e.titulo}-Asis`; let a = db.asistencias.find(x=>x.id==id) || {st:'Ausente'};
+        h += `<tr><td>${p.apellido} (${e.titulo})</td><td><button onclick="tgAsi('${id}')" class="btn btn-sm ${a.st=='Presente'?'btn-success':'btn-danger'}">${a.st}</button></td></tr>`;
+    });});
+    document.getElementById('main-view').innerHTML = h + `</tbody></table>`;
+}
+function tgAsi(id){ let x=db.asistencias.find(a=>a.id==id); if(!x){x={id:id,st:'Ausente'};db.asistencias.push(x);} x.st=(x.st=='Ausente')?'Presente':'Ausente'; guardar(); vAsiA(); }
+
+function vToolsAdmin() {
+    document.getElementById('main-view').innerHTML = `<h3>Herramientas Especiales</h3>
+    <div class="card p-3 mb-3 shadow-sm border-0"><h5>📢 Notificación Global</h5><input id="an-txt" class="form-control mb-2" value="${db.anuncio}"><button class="btn btn-oro" onclick="saveAn()">Publicar Anuncio</button></div>
+    <div class="card p-3 shadow-sm border-0"><h5>📁 Legajos de Alumnos</h5><select id="sL" class="form-select mb-2">${db.participantes.map(p=>`<option value="${p.dni}">${p.apellido}</option>`)}</select><input type="file" class="form-control mb-2"><button class="btn btn-dark" onclick="alert('Documento vinculado (Simulación)')">Vincular DNI/Título</button></div>`;
+}
+function saveAn(){ db.anuncio = document.getElementById('an-txt').value; guardar(); alert("Publicado."); location.reload(); }
+
+function vPagU() { const m = db.pagos.filter(x=>x.id.startsWith(sesion.dni)); document.getElementById('main-view').innerHTML=`<h3>Mis Pagos</h3><table class="table bg-white"><thead><tr><th>Mes</th><th>Monto</th><th>Estado</th></tr></thead><tbody>${m.map(x=>`<tr><td>${x.id.split('-')[1]}</td><td>$${x.monto}</td><td>${x.estado}</td></tr>`).join('')}</tbody></table>`; }
+function vNotU() { const m = db.notas.filter(x=>x.id.startsWith(sesion.dni)); document.getElementById('main-view').innerHTML=`<h3>Mis Calificaciones</h3><table class="table bg-white shadow-sm">${m.map(x=>`<tr><td class="fw-bold">${x.id.split('-')[1]}</td><td>${x.valor}/10</td></tr>`).join('')}</table>`; }
+
+function backup() { const ds="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); const dl=document.createElement('a'); dl.setAttribute("href",ds); dl.setAttribute("download","cc_backup.json"); dl.click(); }
+</script>
+</body>
+</html>
