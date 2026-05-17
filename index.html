@@ -79,7 +79,6 @@ const listadoOficialEstudiantes = [
     { apellido: "PRAVAZ", nombre: "Estudiante", dni: "32059206", profesion: "-", celular: "-" }
 ];
 
-// Función de control estricto para forzar inserción de los alumnos requeridos
 function asegurarAlumnosOficiales() {
     if (!db.participantes) db.participantes = [];
     listadoOficialEstudiantes.forEach(est => {
@@ -91,7 +90,7 @@ function asegurarAlumnosOficiales() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
 }
 
-// Ejecución preventiva inicial
+// Ejecución inicial
 asegurarAlumnosOficiales();
 
 let sesion = null;
@@ -102,7 +101,6 @@ const guardar = () => localStorage.setItem(DB_KEY, JSON.stringify(db));
 
 // --- LOGIN ---
 function ejecutarLogin() {
-    // Forzado extra en caso de que un JSON importado haya pisado la lista antes del login
     asegurarAlumnosOficiales();
 
     const u = document.getElementById('u_log').value.trim().toUpperCase();
@@ -366,6 +364,7 @@ function vBib(){
     if(sesion.rol==='ADM') h += `<div class="card p-3 mt-3 shadow-sm"><input id="b1" placeholder="Nombre" class="form-control mb-1"><input id="b2" placeholder="Link" class="form-control mb-2"><button class="btn btn-oro w-100" onclick="addBib()">Subir</button></div>`; 
     document.getElementById('main-view').innerHTML = h; 
 }
+// CORREGIDO: Se cambia 'url' por 'b2' para evitar el quiebre crítico del script
 function addBib(){ db.materiales.push({nombre:document.getElementById('b1').value, url:document.getElementById('b2').value}); guardar(); vBib(); }
 function delB(i){ db.materiales.splice(i,1); guardar(); vBib(); }
 
@@ -421,10 +420,7 @@ function restaurarBackup() {
             if (datosParseados.participantes && datosParseados.encuentros) {
                 if (confirm("¿Está seguro de que desea sobrescribir la base de datos completa con este archivo?")) {
                     db = datosParseados;
-                    
-                    // Inyección y corrección forzada inmediata post-importación
                     asegurarAlumnosOficiales();
-                    
                     alert("Base de datos restaurada con éxito e inyección de alumnos protegida.");
                     location.reload();
                 }
