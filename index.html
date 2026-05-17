@@ -69,7 +69,7 @@ let db = JSON.parse(localStorage.getItem(DB_KEY)) || {
     participantes: [], encuentros: [], talleres: [], agenda: [], pagos: [], asistencias: [], notas: [], materiales: [], analiticosVisibles: {}, testsIA: [], anuncio: "", legajos: {} 
 };
 
-// Inyección y normalización del listado de estudiantes requeridos
+// Listado oficial absoluto
 const listadoOficialEstudiantes = [
     { apellido: "SCHWAB", nombre: "Estudiante", dni: "24557473", profesion: "-", celular: "-" },
     { apellido: "RIOS", nombre: "Estudiante", dni: "17319305", profesion: "-", celular: "-" },
@@ -79,10 +79,14 @@ const listadoOficialEstudiantes = [
     { apellido: "PRAVAZ", nombre: "Estudiante", dni: "32059206", profesion: "-", celular: "-" }
 ];
 
-if (db.participantes.length === 0) {
-    db.participantes = listadoOficialEstudiantes;
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-}
+// Asegura de manera forzada la existencia de los estudiantes oficiales
+listadoOficialEstudiantes.forEach(est => {
+    const existe = db.participantes.some(p => p.dni === est.dni);
+    if (!existe) {
+        db.participantes.push(est);
+    }
+});
+localStorage.setItem(DB_KEY, JSON.stringify(db));
 
 let sesion = null;
 let testTemp = null;
@@ -257,7 +261,6 @@ function publicarIA(){
     db.testsIA.push(testTemp); guardar(); testTemp = null; vEditorIA(); renderMenu();
 }
 
-// --- COMPLEMENTOS DE RENDERIZADO ---
 function drawListaIA(){
     let h = `<ul class="list-group shadow-sm">`;
     db.testsIA.forEach((t, i) => { h += `<li class="list-group-item d-flex justify-content-between align-items-center"><b>${t.titulo} (${t.nivel})</b> <button class="btn btn-sm btn-danger" onclick="delIA(${i})">X</button></li>`; });
@@ -265,6 +268,7 @@ function drawListaIA(){
 }
 function delIA(i){ db.testsIA.splice(i,1); guardar(); vEditorIA(); renderMenu(); }
 
+// --- VISTA ALUMNO: EXAMEN ---
 function vRenderAluTest(titulo) {
     const test = db.testsIA.find(x => x.titulo === titulo);
     const ya = db.notas.find(n => n.id === `${sesion.dni}-${titulo}`);
@@ -353,7 +357,7 @@ function vBib(){
     if(sesion.rol==='ADM') h += `<div class="card p-3 mt-3 shadow-sm"><input id="b1" placeholder="Nombre" class="form-control mb-1"><input id="b2" placeholder="Link" class="form-control mb-2"><button class="btn btn-oro w-100" onclick="addBib()">Subir</button></div>`; 
     document.getElementById('main-view').innerHTML = h; 
 }
-function addBib(){ db.materiales.push({nombre:document.getElementById('b1').value, url:document.getElementById('b2').value}); guardar(); vBib(); }
+function addBib(){ db.materiales.push({nombre:document.getElementById('b1').value, url:document.getElementById('url').value}); guardar(); vBib(); }
 function delB(i){ db.materiales.splice(i,1); guardar(); vBib(); }
 
 function vAsiA() {
@@ -366,13 +370,15 @@ function vAsiA() {
 }
 function tgAsi(id){ let x=db.asistencias.find(a=>a.id==id); if(!x){x={id:id,st:'Ausente'};db.asistencias.push(x);} x.st=(x.st=='Ausente')?'Presente':'Ausente'; guardar(); vAsiA(); }
 
-// --- HERRAMIENTAS ADM & BACKUP INTEGRADO ---
+// --- HERRAMIENTAS ADM & INTERFAZ BACKUP COMPLETA ---
 function vToolsAdmin() {
     document.getElementById('main-view').innerHTML = `<h3>Herramientas Especiales</h3>
     <div class="card p-3 mb-3 shadow-sm border-0"><h5>📢 Notificación Global</h5><input id="an-txt" class="form-control mb-2" value="${db.anuncio}"><button class="btn btn-oro" onclick="saveAn()">Publicar Anuncio</button></div>
     
+    <!-- NUEVA SECCIÓN: SUBIDA/RESTAURACIÓN DE ARCHIVOS JSON DE BACKUP -->
     <div class="card p-3 mb-3 shadow-sm border-0">
         <h5>🔄 Restaurar Base de Datos desde Respaldo (.json)</h5>
+        <p class="small text-muted">Seleccione el archivo .json descargado previamente para restaurar el estado completo de las notas, asistencias, alumnos y configuraciones.</p>
         <input type="file" id="import-file" class="form-control mb-2" accept=".json">
         <button class="btn btn-danger fw-bold" onclick="restaurarBackup()">Cargar e Importar Datos</button>
     </div>
@@ -384,7 +390,14 @@ function saveAn(){ db.anuncio = document.getElementById('an-txt').value; guardar
 function vPagU() { const m = db.pagos.filter(x=>x.id.startsWith(sesion.dni)); document.getElementById('main-view').innerHTML=`<h3>Mis Pagos</h3><table class="table bg-white"><thead><tr><th>Mes</th><th>Monto</th><th>Estado</th></tr></thead><tbody>${m.map(x=>`<tr><td>${x.id.split('-')[1]}</td><td>$${x.monto}</td><td>${x.estado}</td></tr>`).join('')}</tbody></table>`; }
 function vNotU() { const m = db.notas.filter(x=>x.id.startsWith(sesion.dni)); document.getElementById('main-view').innerHTML=`<h3>Mis Calificaciones</h3><table class="table bg-white shadow-sm">${m.map(x=>`<tr><td class="fw-bold">${x.id.split('-')[1]}</td><td>${x.valor}/10</td></tr>`).join('')}</table>`; }
 
-function backup() { const ds="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); const dl=document.createElement('a'); dl.setAttribute("href",ds); dl.setAttribute("download","cc_backup.json"); dl.click(); }
+// --- FUNCIONES LÓGICAS DE RESPALDO (BAJAR Y SUBIR .JSON) ---
+function backup() { 
+    const ds = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db)); 
+    const dl = document.createElement('a'); 
+    dl.setAttribute("href", ds); 
+    dl.setAttribute("download", "cc_backup.json"); 
+    dl.click(); 
+}
 
 function restaurarBackup() {
     const archivoInput = document.getElementById('import-file');
