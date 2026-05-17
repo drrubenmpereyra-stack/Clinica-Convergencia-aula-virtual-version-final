@@ -35,7 +35,7 @@
         <hr>
         <div class="text-start">
             <label class="small fw-bold">Apellido (Usuario):</label>
-            <input type="text" id="u_log" class="form-control mb-2 shadow-sm">
+            <input type="text" id="u_log" class="form-control mb-2 shadow-sm" style="text-transform: uppercase;">
             <label class="small fw-bold">DNI (Contraseña):</label>
             <input type="password" id="p_log" class="form-control mb-3 shadow-sm">
         </div>
@@ -68,6 +68,22 @@ const DB_KEY = 'cc_v38_db';
 let db = JSON.parse(localStorage.getItem(DB_KEY)) || { 
     participantes: [], encuentros: [], talleres: [], agenda: [], pagos: [], asistencias: [], notas: [], materiales: [], analiticosVisibles: {}, testsIA: [], anuncio: "", legajos: {} 
 };
+
+// Inyección y normalización del listado de estudiantes requeridos
+const listadoOficialEstudiantes = [
+    { apellido: "SCHWAB", nombre: "Estudiante", dni: "24557473", profesion: "-", celular: "-" },
+    { apellido: "RIOS", nombre: "Estudiante", dni: "17319305", profesion: "-", celular: "-" },
+    { apellido: "RODRIGUEZ", nombre: "Estudiante", dni: "17319325", profesion: "-", celular: "-" },
+    { apellido: "STEFANINI", nombre: "Estudiante", dni: "30772297", profesion: "-", celular: "-" },
+    { apellido: "CAON", nombre: "Estudiante", dni: "32458703", profesion: "-", celular: "-" },
+    { apellido: "PRAVAZ", nombre: "Estudiante", dni: "32059206", profesion: "-", celular: "-" }
+];
+
+if (db.participantes.length === 0) {
+    db.participantes = listadoOficialEstudiantes;
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
 let sesion = null;
 let testTemp = null;
 let timerVar = null;
@@ -83,7 +99,7 @@ function ejecutarLogin() {
         sesion = { rol: 'ADM', nombre: 'Dr. Rubén Pereyra', dni: '0' };
     } else {
         const f = db.participantes.find(x => x.apellido.toUpperCase() === u && x.dni === p);
-        if(f) sesion = { rol: 'USR', nombre: f.nombre + " " + f.apellido, dni: f.dni };
+        if(f) sesion = { rol: 'USR', nombre: f.apellido, dni: f.dni };
         else return alert("Credenciales incorrectas.");
     }
 
@@ -112,10 +128,9 @@ function renderMenu() {
              <div class="nav-link" onclick="vBib()">📚 Biblioteca</div><hr>`;
     
     if(!isA) {
-        // Carga de Tests Publicados para Alumnos
         if(db.testsIA) {
             db.testsIA.filter(t => t.publicado).forEach(t => {
-                const n = db.notas.find(nota => nota.id === `${sesion.dni}-${t.titulo}`);
+                const n = db.notas ? db.notas.find(nota => nota.id === `${sesion.dni}-${t.titulo}`) : null;
                 h += `<div class="nav-link btn-test-nav" onclick="vRenderAluTest('${t.titulo}')">📝 ${t.titulo} ${n ? '('+n.valor+'/10)' : ''}</div>`;
             });
         }
@@ -152,7 +167,7 @@ function vHome() {
     }
 }
 
-// --- FUNCIONES RESTAURADAS (CORE) ---
+// --- GESTIÓN DE PARTICIPANTES ---
 function vPart() {
     let h = `<h3>Participantes</h3><div class="card p-3 mb-3 bg-light border-0 shadow-sm"><div class="row g-2">
     <div class="col-md-2"><input id="p1" placeholder="Apellido" class="form-control"></div>
@@ -182,7 +197,7 @@ function vEncs() {
 function addE(){ db.encuentros.push({titulo:document.getElementById('e1').value, fecha:document.getElementById('e2').value, meet:document.getElementById('e3').value, grab:document.getElementById('e4').value}); guardar(); vEncs(); renderMenu(); }
 function delE(i){ db.encuentros.splice(i,1); guardar(); vEncs(); }
 
-// --- MÓDULO IA AVANZADO (V38) ---
+// --- MÓDULO EXÁMENES IA ---
 function vEditorIA() {
     let h = `<h3>Editor de Exámenes IA (Completo)</h3>
     <div class="card p-4 bg-light mb-4 border-0 shadow-sm">
@@ -222,7 +237,7 @@ function generarIAPedagogica() {
     const frases = txt.split('.').filter(l => l.trim().length > 30).slice(0, 10);
     const preguntas = frases.map((l, i) => {
         if(tipo === 'multi') return { q: `¿Cuál de las siguientes palabras define el concepto: "${l.substring(0,40)}..."?`, o1: l.trim().split(' ')[0], o2: "Término B", o3: "Término C", o4: "Todas son correctas", o5: "Ninguna es correcta", ans: "a" };
-        if(tipo === 'frases') return { q: `Complete la frase del Dr. Pereyra: "${l.substring(0,30)} __________".`, o1: "Palabra_A", o2: "Palabra_A", o3: "Palabra_A", o4: "Palabra_A", o5: "Palabra_A", ans: "a" };
+        if(tipo === 'frases') return { q: `Complete la frase: "${l.substring(0,30)} __________".`, o1: "Palabra_A", o2: "Palabra_A", o3: "Palabra_A", o4: "Palabra_A", o5: "Palabra_A", ans: "a" };
         return { q: `Analice clínicamente: "${l.trim()}"`, abierta: true, criterio: l.trim() };
     });
 
@@ -242,6 +257,7 @@ function publicarIA(){
     db.testsIA.push(testTemp); guardar(); testTemp = null; vEditorIA(); renderMenu();
 }
 
+// --- COMPLEMENTOS DE RENDERIZADO ---
 function drawListaIA(){
     let h = `<ul class="list-group shadow-sm">`;
     db.testsIA.forEach((t, i) => { h += `<li class="list-group-item d-flex justify-content-between align-items-center"><b>${t.titulo} (${t.nivel})</b> <button class="btn btn-sm btn-danger" onclick="delIA(${i})">X</button></li>`; });
@@ -249,7 +265,6 @@ function drawListaIA(){
 }
 function delIA(i){ db.testsIA.splice(i,1); guardar(); vEditorIA(); renderMenu(); }
 
-// --- VISTA ALUMNO: EXAMEN ---
 function vRenderAluTest(titulo) {
     const test = db.testsIA.find(x => x.titulo === titulo);
     const ya = db.notas.find(n => n.id === `${sesion.dni}-${titulo}`);
@@ -268,7 +283,7 @@ function vRenderAluTest(titulo) {
 }
 function finTestV38(t){ clearInterval(timerVar); alert("Examen enviado para procesamiento IA."); sManual(`${sesion.dni}-${t}`, 10); renderMenu(); vHome(); }
 
-// --- GESTIÓN ADMINISTRATIVA ---
+// --- CONTROLES ADMINISTRATIVOS DE REGISTROS ---
 function vPagA() {
     let h = `<h3>Registro de Pagos</h3><table class="table text-center table-sm bg-white shadow-sm"><thead><tr class="table-dark"><th>Alumno</th><th>Mes</th><th>Monto $</th><th>Medio</th><th>Estado</th></tr></thead><tbody>`;
     db.participantes.forEach(p => { db.encuentros.forEach(e => {
@@ -316,7 +331,7 @@ function getPDF(dni, nom) {
     doc.save(`Analitico_${nom}.pdf`);
 }
 
-// --- BOTONES RESTAURADOS ---
+// --- RECURSOS Y CONTENIDOS ---
 function vTals(){ 
     let h = `<h3>Talleres</h3>`; if(sesion.rol==='ADM') h += `<div class="card p-3 mb-3 bg-light shadow-sm"><input id="t1" placeholder="Nombre" class="form-control mb-1"><input id="t2" placeholder="Material" class="form-control mb-2"><button class="btn btn-oro w-100" onclick="addT()">Guardar</button></div>`;
     h += `<div class="row">${db.talleres.map((t,i)=>`<div class="col-md-6 mb-2"><div class="card p-3 shadow-sm"><h5>${t.nombre}</h5><a href="${t.link}" target="_blank" class="btn btn-sm btn-outline-primary">Ver Drive</a>${sesion.rol==='ADM'?`<button onclick="delT(${i})" class="btn btn-sm btn-link text-danger">Borrar</button>`:''}</div></div>`).join('')}</div>`;
@@ -351,9 +366,17 @@ function vAsiA() {
 }
 function tgAsi(id){ let x=db.asistencias.find(a=>a.id==id); if(!x){x={id:id,st:'Ausente'};db.asistencias.push(x);} x.st=(x.st=='Ausente')?'Presente':'Ausente'; guardar(); vAsiA(); }
 
+// --- HERRAMIENTAS ADM & BACKUP INTEGRADO ---
 function vToolsAdmin() {
     document.getElementById('main-view').innerHTML = `<h3>Herramientas Especiales</h3>
     <div class="card p-3 mb-3 shadow-sm border-0"><h5>📢 Notificación Global</h5><input id="an-txt" class="form-control mb-2" value="${db.anuncio}"><button class="btn btn-oro" onclick="saveAn()">Publicar Anuncio</button></div>
+    
+    <div class="card p-3 mb-3 shadow-sm border-0">
+        <h5>🔄 Restaurar Base de Datos desde Respaldo (.json)</h5>
+        <input type="file" id="import-file" class="form-control mb-2" accept=".json">
+        <button class="btn btn-danger fw-bold" onclick="restaurarBackup()">Cargar e Importar Datos</button>
+    </div>
+
     <div class="card p-3 shadow-sm border-0"><h5>📁 Legajos de Alumnos</h5><select id="sL" class="form-select mb-2">${db.participantes.map(p=>`<option value="${p.dni}">${p.apellido}</option>`)}</select><input type="file" class="form-control mb-2"><button class="btn btn-dark" onclick="alert('Documento vinculado (Simulación)')">Vincular DNI/Título</button></div>`;
 }
 function saveAn(){ db.anuncio = document.getElementById('an-txt').value; guardar(); alert("Publicado."); location.reload(); }
@@ -362,6 +385,34 @@ function vPagU() { const m = db.pagos.filter(x=>x.id.startsWith(sesion.dni)); do
 function vNotU() { const m = db.notas.filter(x=>x.id.startsWith(sesion.dni)); document.getElementById('main-view').innerHTML=`<h3>Mis Calificaciones</h3><table class="table bg-white shadow-sm">${m.map(x=>`<tr><td class="fw-bold">${x.id.split('-')[1]}</td><td>${x.valor}/10</td></tr>`).join('')}</table>`; }
 
 function backup() { const ds="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); const dl=document.createElement('a'); dl.setAttribute("href",ds); dl.setAttribute("download","cc_backup.json"); dl.click(); }
+
+function restaurarBackup() {
+    const archivoInput = document.getElementById('import-file');
+    if (!archivoInput.files || archivoInput.files.length === 0) {
+        alert("Por favor, seleccione un archivo .json primero.");
+        return;
+    }
+    const archivo = archivoInput.files[0];
+    const lector = new FileReader();
+    lector.onload = function(e) {
+        try {
+            const datosParseados = JSON.parse(e.target.result);
+            if (datosParseados.participantes && datosParseados.encuentros) {
+                if (confirm("¿Está seguro de que desea sobrescribir la base de datos completa con este archivo?")) {
+                    db = datosParseados;
+                    guardar();
+                    alert("Base de datos restaurada con éxito.");
+                    location.reload();
+                }
+            } else {
+                alert("Error: El archivo no corresponde a una estructura válida de este sistema.");
+            }
+        } catch (err) {
+            alert("Error al procesar el archivo JSON.");
+        }
+    };
+    lector.readAsText(archivo);
+}
 </script>
 </body>
 </html>
